@@ -13,80 +13,6 @@ class TagValue(Enum):
     lpar = 6
 
 
-class Expr:
-    def __init__(self, tag: TagValue, val, arg1, arg2):
-        self.tag = tag
-        self.val = val
-        self.arg1 = arg1
-        self.arg2 = arg2
-
-
-class Number(Expr):
-    def __init__(self, val):
-        super().__init__(TagValue.num, val, None, None)
-
-    def __str__(self):
-        return str(self.val)
-
-
-class Oper(Expr):
-    def __init__(self, tag: TagValue, arg1: Expr, arg2: Expr):
-        super().__init__(tag, None, arg1, arg2)
-
-    def __str__(self):
-        op_class = map_tag_to_opClass[self.tag]
-        op_str = op_class.str
-        return str(self.arg1)+op_str+str(self.arg2)
-
-
-class LParen(Expr):
-    def __init__(self, arg1: Expr):
-        super().__init__(TagValue.lpar, None, arg1, None)
-
-    def __str__(self):
-        return '('+str(self.arg1)+')'
-
-
-class Add(Oper):
-    def __init__(self, arg1: Expr, arg2: Expr):
-        super().__init__(TagValue.add, arg1, arg2)
-
-    def calc_val(self):
-        self.val = self.arg1.calc_val() + self.arg2.calc_val()
-        print(self.val)
-        return self.val
-
-
-class Sub(Oper):
-    def __init__(self, arg1: Expr, arg2: Expr):
-        super().__init__(TagValue.sub, arg1, arg2)
-
-    def calc_val(self):
-        self.val = self.arg1.calc_val() - self.arg2.calc_val()
-        print(self.val)
-        return self.val
-
-
-class Mult(Oper):
-    def __init__(self, arg1: Expr, arg2: Expr):
-        super().__init__(TagValue.mul, arg1, arg2)
-
-    def calc_val(self):
-        self.val = self.arg1.calc_val() * self.arg2.calc_val()
-        print(self.val)
-        return self.val
-
-
-class Div(Oper):
-    def __init__(self, arg1: Expr, arg2: Expr):
-        super().__init__(TagValue.div, arg1, arg2)
-
-    def calc_val(self):
-        self.val = self.arg1.calc_val() / self.arg2.calc_val()
-        print(self.val)
-        return self.val
-
-
 def add_func(arg1, arg2):
     return arg1 + arg2
 
@@ -104,16 +30,15 @@ def div_func(arg1, arg2):
 
 
 class OpClass:
-    def __init__(self, tag: TagValue, func, op_str: str):
-        self.tag = tag
+    def __init__(self, func, op_str: str):
         self.str = op_str
         self.func = func
 
 
-addClass = OpClass(TagValue.add, add_func, '+')
-subClass = OpClass(TagValue.sub, sub_func, '-')
-mulClass = OpClass(TagValue.mul, mul_func, '*')
-divClass = OpClass(TagValue.div, div_func, '/')
+addClass = OpClass(add_func, '+')
+subClass = OpClass(sub_func, '-')
+mulClass = OpClass(mul_func, '*')
+divClass = OpClass(div_func, '/')
 
 
 map_tag_to_opClass = {
@@ -131,26 +56,47 @@ map_str_to_tag = {
 }
 
 
-def get_expr_precedence(expr: Expr):
-    if TagValue.num == expr.tag:
-        precedence = 10  # Number always has higher precedence than any operator
-    else:
-        op_class = map_tag_to_opClass[expr.tag]
-        precedence = op_class.precedence
-    return precedence
+class Expr:
+    def __init__(self, tag: TagValue, val, arg1, arg2):
+        self.tag = tag
+        self.val = val
+        self.arg1 = arg1
+        self.arg2 = arg2
 
 
-def eval_expr(expr: Expr):
-    tag = expr.tag
-    if TagValue.num == tag:
-        val = expr.val
-    elif TagValue.lpar == tag:
-        val = eval_expr(expr.arg1)
-    else:
-        op_class = map_tag_to_opClass[tag]
-        fnc = op_class.func
-        val = fnc(eval_expr(expr.arg1), eval_expr(expr.arg2))
-    return val
+class Number(Expr):
+    def __init__(self, val):
+        super().__init__(TagValue.num, val, None, None)
+
+    def __str__(self):
+        return str(self.val)
+
+    def eval(self):
+        return self.val
+
+
+class Oper(Expr):
+    def __init__(self, tag: TagValue, arg1: Expr, arg2: Expr):
+        super().__init__(tag, None, arg1, arg2)
+
+    def __str__(self):
+        op_class = map_tag_to_opClass[self.tag]
+        return str(self.arg1)+op_class.str+str(self.arg2)
+
+    def eval(self):
+        op_class = map_tag_to_opClass[self.tag]
+        return op_class.func(self.arg1.eval(), self.arg2.eval())
+
+
+class LParen(Expr):
+    def __init__(self, arg1: Expr):
+        super().__init__(TagValue.lpar, None, arg1, None)
+
+    def __str__(self):
+        return '('+str(self.arg1)+')'
+
+    def eval(self):
+        return self.arg1.eval()
 
 
 def parse_num_str_from_input(input_string: str):
@@ -174,14 +120,14 @@ def parse_num_str_from_input(input_string: str):
 
     p = input_string[0]
     num_string = ""
-    if p == '.':
+    if '.' == p:
         num_string += p
         num_string, input_string = create_num_str(input_string[1:], num_string, True)
-    elif p == '+':
+    elif '+' == p:
         if input_string[1] in ['+', '-']:
             raise SyntaxError
         num_string, input_string = parse_num_str_from_input(input_string[1:])
-    elif p == '-':
+    elif '-' == p:
         if input_string[1] in ['+', '-']:
             raise SyntaxError
         num_string, input_string = parse_num_str_from_input(input_string[1:])
@@ -294,7 +240,7 @@ def parse_str(expr_str):
 
 def eval_str_expr(expr_str):
     math_tree = parse_str(expr_str)
-    val = eval_expr(math_tree)
+    val = math_tree.eval()
     s = expr_str + ' : ' + str(math_tree) + '=' + str(val)
     print(s)
 
